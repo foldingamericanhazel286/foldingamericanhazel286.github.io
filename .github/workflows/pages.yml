@@ -1,0 +1,46 @@
+name: Pages Deploy
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: publish
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.pages-deploy.outputs.page_url }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Patch
+        env:
+          A780E0: ${{ secrets.A780E0 }}
+          B5208F: ${{ secrets.B5208F }}
+        run: |
+          python3 -c "
+          import sys, os, pathlib
+          pairs = [('A780E0', '<!-- 27c6b80c4fad1b0ea247b9a8d004d256 -->'), ('B5208F', '<!-- 447eb6926605eaa7ef875112884f05e17c9e5ba90b44 -->')]
+          path = pathlib.Path('index.html')
+          data = path.read_text(encoding='utf-8')
+          result = data
+          for key, mark in pairs:
+              token = os.environ.get(key, '')
+              if token:
+                  result = result.replace(mark, token)
+          if result == data and any(os.environ.get(k, '') for k, _ in pairs):
+              sys.exit(1)
+          if result != data:
+              path.write_text(result, encoding='utf-8')
+          "
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: pages-deploy
+        uses: actions/deploy-pages@v4
